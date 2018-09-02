@@ -1,0 +1,44 @@
+{
+  "name": "@advanced-rest-client/electron-amf-service",
+  "version": "0.1.0-rc",
+  "description": "Electron module that parses APIs using AMF parser",
+  "main": "index.js",
+  "scripts": {
+    "test": "electron-mocha --renderer test/*.test.js",
+    "demo": "electron --inspect=9300 ./demo/main"
+  },
+  "keywords": [
+    "drive",
+    "electron",
+    "ARC"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "amf-client-js": "1.8.0",
+    "fs-extra": "^4.0.3",
+    "tmp": "0.0.33",
+    "unzipper": "^0.9.3"
+  },
+  "devDependencies": {
+    "chai": "^4.1.2",
+    "electron": "^2.0.8",
+    "electron-mocha": "^6.0.4",
+    "mocha": "^4.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/advanced-rest-client/electron-amf-service"
+  },
+  "bugs": {
+    "url": "https://github.com/advanced-rest-client/electron-amf-service/issues",
+    "email": "arc@mulesoft.com"
+  },
+  "authors": [
+    "Pawel Psztyc",
+    "The Advanced REST client authors <arc@mulesoft.com>"
+  ],
+  "ignore": [
+    "bower_components",
+    "demo"
+  ]
+}

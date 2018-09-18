@@ -9,6 +9,36 @@ class ElectronAmfService {
     this._fileHandler = this._fileHandler.bind(this);
   }
   /**
+   * Sets `loading` flag.
+   * When `true` then it dispatches `process-loading-start` custom event.
+   * When `false` then it dispatches `process-loading-stop` custom event.
+   * @param {Boolean} value
+   */
+  set loading(value) {
+    if (this.__loading === value) {
+      return;
+    }
+    this.__loading = value;
+    let type = 'process-loading-' + (value ? 'start' : 'stop');
+    let detail;
+    if (value) {
+      this.__loadingId = Date.now();
+      detail = {
+        message: 'Processing API data',
+        indeterminate: true
+      };
+    } else {
+      detail = {};
+    }
+    detail.id = this.__loadingId;
+    this.fire(type, detail);
+  }
+
+  get loading() {
+    return this.__loading;
+  }
+
+  /**
    * Observes for ARC's DOM events
    */
   listen() {
@@ -89,8 +119,13 @@ class ElectronAmfService {
    * @return {Promise<Object>} Promise resolved to the AMF json-ld model.
    */
   processApiLink(url) {
+    this.loading = true;
     return this.downloadRamlData(url)
-    .then((buffer) => this.processBuffer(buffer));
+    .then((buffer) => this.processBuffer(buffer))
+    .catch((cause) => {
+      this.loading = false;
+      throw cause;
+    });
   }
   /**
    * Procesases file data.
@@ -103,8 +138,13 @@ class ElectronAmfService {
   processApiFile(file) {
     // const t = file.type;
     // const zip = (t && t.indexOf('/zip') !== -1) ? true : false;
+    this.loading = true;
     return this._fileToBuffer(file)
-    .then((buffer) => this.processBuffer(buffer));
+    .then((buffer) => this.processBuffer(buffer))
+    .catch((cause) => {
+      this.loading = false;
+      throw cause;
+    });
   }
   /**
    * Parses API data to AMF model.
@@ -114,6 +154,9 @@ class ElectronAmfService {
    * @return {Promise<Object>} Promise resolved to the AMF json-ld model
    */
   processBuffer(buffer, opts) {
+    if (!this.loading) {
+      this.loading = true;
+    }
     if (this._bufferIsZip(buffer)) {
       if (!opts) {
         opts = {};
@@ -153,6 +196,10 @@ class ElectronAmfService {
       } else {
         return this.amfService.parse();
       }
+    })
+    .catch((cause) => {
+      this.loading = false;
+      throw cause;
     });
   }
   /**

@@ -132,6 +132,14 @@ The functions are:
 
 See renderer/electron-amf-service.js for API details.
 
+## Loading state
+
+When the module start processing API data or Exchange asset it dispatches
+`process-loading-start` custom event with `message` and `id` property.
+Hosting application should handle this event to render any kind of UI indicating
+ongoing process. When the program finish it dispatches `process-loading-stop`
+custom event with the same `id` used with "start" event.
+
 ## API components
 
 This module is part of the API components ecosystem. It is used in Advanced REST

@@ -122,6 +122,10 @@ class ElectronAmfService {
     this.loading = true;
     return this.downloadRamlData(url)
     .then((buffer) => this.processBuffer(buffer))
+    .then((result) => {
+      this.loading = false;
+      return result;
+    })
     .catch((cause) => {
       this.loading = false;
       throw cause;
@@ -141,6 +145,10 @@ class ElectronAmfService {
     this.loading = true;
     return this._fileToBuffer(file)
     .then((buffer) => this.processBuffer(buffer))
+    .then((result) => {
+      this.loading = false;
+      return result;
+    })
     .catch((cause) => {
       this.loading = false;
       throw cause;
@@ -196,6 +204,10 @@ class ElectronAmfService {
       } else {
         return this.amfService.parse();
       }
+    })
+    .then((result) => {
+      this.loading = false;
+      return result;
     })
     .catch((cause) => {
       this.loading = false;

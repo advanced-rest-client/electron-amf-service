@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "electron-mocha --renderer test/*.test.js",
-    "demo": "electron --inspect=9300 ./demo/main"
+    "demo": "electron --inspect=9300 ./demo/main",
+    "test-conventer": "electron-mocha --renderer test/amf-conventer.test.js"
   },
   "keywords": [
     "drive",

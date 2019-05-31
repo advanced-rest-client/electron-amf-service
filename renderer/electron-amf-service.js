@@ -169,7 +169,7 @@ class ElectronAmfService {
       if (!opts) {
         opts = {};
       }
-      opts.zip = opts;
+      opts.zip = true;
     }
     if (!this.amfService) {
       this.amfService = new AmfService(buffer, opts);

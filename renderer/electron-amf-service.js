@@ -1,9 +1,12 @@
-const {AmfService} = require('../lib/amf-service');
+import { AmfService } from '../lib/amf-service';
 /**
  * A class to be used in the renderer process to download and extract RAML
  * data from Exchange asset.
  */
-class ElectronAmfService {
+export class ElectronAmfService {
+  /**
+   * @constructor
+   */
   constructor() {
     this._assetHandler = this._assetHandler.bind(this);
     this._fileHandler = this._fileHandler.bind(this);
@@ -19,13 +22,13 @@ class ElectronAmfService {
       return;
     }
     this.__loading = value;
-    let type = 'process-loading-' + (value ? 'start' : 'stop');
+    const type = 'process-loading-' + (value ? 'start' : 'stop');
     let detail;
     if (value) {
       this.__loadingId = Date.now();
       detail = {
         message: 'Processing API data',
-        indeterminate: true
+        indeterminate: true,
       };
     } else {
       detail = {};
@@ -33,11 +36,21 @@ class ElectronAmfService {
     detail.id = this.__loadingId;
     this.fire(type, detail);
   }
-
+  /**
+   * @return {Boolean} Loading state
+   */
   get loading() {
     return this.__loading;
   }
-
+  /**
+   * @return {AmfService} A reference to AMF service
+   */
+  get service() {
+    if (!this._amfService) {
+      this._amfService = new AmfService();
+    }
+    return this._amfService;
+  }
   /**
    * Observes for ARC's DOM events
    */
@@ -51,19 +64,20 @@ class ElectronAmfService {
    * @return {Promise}
    */
   unlisten() {
-    window.removeEventListener('process-exchange-asset-data', this._assetHandler);
+    window.removeEventListener('process-exchange-asset-data',
+        this._assetHandler);
     window.removeEventListener('api-process-file', this._fileHandler);
     return this.cleanup();
   }
-
-  cleanup() {
-    if (this.amfService) {
-      return this.amfService.cleanup()
-      .then(() => {
-        this.amfService = undefined;
-      });
+  /**
+   * Cleans up the working dir after work is done.
+   * @return {Promise}
+   */
+  async cleanup() {
+    const service = this.service;
+    if (service.source) {
+      await service.cleanup();
     }
-    return Promise.resolve();
   }
   /**
    * Handler for the `process-exchange-asset-data` custom event from Exchange
@@ -71,7 +85,7 @@ class ElectronAmfService {
    *
    * @param {CustomEvent} e
    */
-  _assetHandler(e) {
+  async _assetHandler(e) {
     if (e.defaultPrevented) {
       return;
     }
@@ -85,16 +99,15 @@ class ElectronAmfService {
       this.notifyError('RAML data not found in the asset.');
       return;
     }
-    this.processApiLink(file.externalLink)
-    .then((model) => {
+    try {
+      const model = await this.processApiLink(file.externalLink);
       setTimeout(() => {
         this.notifyApi(model);
       });
       return model;
-    })
-    .catch((cause) => {
+    } catch (cause) {
       this.notifyError(cause.message);
-    });
+    }
   }
   /**
    * Handles `api-process-file` custom event.
@@ -118,18 +131,17 @@ class ElectronAmfService {
    * @param {String} url API remote location.
    * @return {Promise<Object>} Promise resolved to the AMF json-ld model.
    */
-  processApiLink(url) {
+  async processApiLink(url) {
     this.loading = true;
-    return this.downloadRamlData(url)
-    .then((buffer) => this.processBuffer(buffer))
-    .then((result) => {
+    try {
+      const buffer = await this.downloadRamlData(url);
+      const result = await this.processBuffer(buffer);
       this.loading = false;
       return result;
-    })
-    .catch((cause) => {
+    } catch (cause) {
       this.loading = false;
       throw cause;
-    });
+    }
   }
   /**
    * Procesases file data.
@@ -139,20 +151,19 @@ class ElectronAmfService {
    * @param {File|Blob} file File to process.
    * @return {Promise<Object>} Promise resolved to the AMF json-ld model
    */
-  processApiFile(file) {
+  async processApiFile(file) {
     // const t = file.type;
     // const zip = (t && t.indexOf('/zip') !== -1) ? true : false;
     this.loading = true;
-    return this._fileToBuffer(file)
-    .then((buffer) => this.processBuffer(buffer))
-    .then((result) => {
+    try {
+      const buffer = await this._fileToBuffer(file);
+      const result = await this.processBuffer(buffer);
       this.loading = false;
       return result;
-    })
-    .catch((cause) => {
+    } catch (cause) {
       this.loading = false;
       throw cause;
-    });
+    }
   }
   /**
    * Parses API data to AMF model.
@@ -161,7 +172,7 @@ class ElectronAmfService {
    * - zip {Boolean} If true the buffer represents zipped file.
    * @return {Promise<Object>} Promise resolved to the AMF json-ld model
    */
-  processBuffer(buffer, opts) {
+  async processBuffer(buffer, opts) {
     if (!this.loading) {
       this.loading = true;
     }
@@ -171,48 +182,50 @@ class ElectronAmfService {
       }
       opts.zip = true;
     }
-    if (!this.amfService) {
-      this.amfService = new AmfService(buffer, opts);
-    } else {
-      this.amfService.setSource(buffer, opts);
-    }
-    return this.amfService.prepare()
-    .then(() => this.amfService.resolve())
-    .then((candidates) => {
+    const service = this.service;
+    service.setSource(buffer, opts);
+
+    let result;
+    let exception;
+    try {
+      await service.prepare();
+      const candidates = await service.resolve();
       if (candidates) {
-        return this.notifyApiCandidates(candidates)
-        .catch((cause) => {
-          return this.amfService.cancel()
-          .then(() => {
-            throw cause;
-          });
-        })
-        .then((file) => {
-          if (file) {
-            return this.amfService.parse(file);
-          }
-          return this.amfService.cancel();
-        })
-        .then((model) => {
-          if (model) {
-            setTimeout(() => {
-              this.notifyApi(model);
-            });
-            return model;
-          }
-        });
+        result = await this._processCandidates(service, candidates);
       } else {
-        return this.amfService.parse();
+        result = await service.parse();
       }
-    })
-    .then((result) => {
-      this.loading = false;
-      return result;
-    })
-    .catch((cause) => {
-      this.loading = false;
-      throw cause;
-    });
+    } catch (cause) {
+      exception = cause;
+    }
+    this.loading = false;
+    if (exception) {
+      throw exception;
+    }
+    return result;
+  }
+  /**
+   * Processes candidates response from the AMF service
+   * @param {AmfService} service A reference to AmfService
+   * @param {Array} candidates List of candidates
+   * @return {Promise}
+   */
+  async _processCandidates(service, candidates) {
+    try {
+      const file = await this.notifyApiCandidates(candidates);
+      if (!file) {
+        await service.cancel();
+      } else {
+        const model = await service.parse(file);
+        setTimeout(() => {
+          this.notifyApi(model);
+        });
+        return model;
+      }
+    } catch (e) {
+      await service.cancel();
+      throw e;
+    }
   }
   /**
    * Tests if the buffer has ZIP file header.
@@ -222,10 +235,14 @@ class ElectronAmfService {
   _bufferIsZip(buffer) {
     return buffer[0] === 0x50 && buffer[1] === 0x4b;
   }
-
-  _fileToBuffer(blob) {
+  /**
+   * Transforms file to a buffer.
+   * @param {Blob} blob A file to process
+   * @return {Promise}
+   */
+  async _fileToBuffer(blob) {
     if (blob instanceof Buffer) {
-      return Promise.resolve(blob);
+      return blob;
     }
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -247,22 +264,27 @@ class ElectronAmfService {
    * @return {Promise} Resolved when components are loaded and process
    * started.
    */
-  downloadRamlData(url) {
-    return fetch(url)
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error(`Unable to download the asset. Status: ${response.status}`);
-      }
-      return response.arrayBuffer();
-    })
-    .then((aBuffer) => Buffer.from(aBuffer));
+  async downloadRamlData(url) {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(
+          `Unable to download the asset. Status: ${response.status}`
+      );
+    }
+    const buff = await response.arrayBuffer();
+    return Buffer.from(buff);
   }
-
+  /**
+   * Dispatches a custom event
+   * @param {String} type Event type
+   * @param {?Object} detail The detail object
+   * @return {CustomEvent} Created event.
+   */
   fire(type, detail) {
     const e = new CustomEvent(type, {
       bubbles: true,
       cancelable: true,
-      detail
+      detail,
     });
     document.body.dispatchEvent(e);
     return e;
@@ -277,7 +299,7 @@ class ElectronAmfService {
     console.error(message);
     this.fire('process-error', {
       message,
-      source: 'amf-service'
+      source: 'amf-service',
     });
   }
   /**
@@ -288,7 +310,7 @@ class ElectronAmfService {
    */
   notifyApi(api) {
     this.fire('api-data-ready', {
-      api
+      api,
     });
   }
   /**
@@ -297,14 +319,13 @@ class ElectronAmfService {
    * @param {Array<String>} candidates
    * @return {Promise<String|undefined>}
    */
-  notifyApiCandidates(candidates) {
+  async notifyApiCandidates(candidates) {
     const e = this.fire('api-select-entrypoint', {
-      candidates
+      candidates,
     });
     if (e.defaultPrevented) {
-      return e.detail.result;
+      return await e.detail.result;
     }
-    return Promise.reject(new Error('No UI for selecting API main file :('));
+    throw new Error('No UI for selecting API main file :(');
   }
 }
-module.exports.ElectronAmfService = ElectronAmfService;

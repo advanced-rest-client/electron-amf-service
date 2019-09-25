@@ -1,11 +1,11 @@
 {
   "name": "@advanced-rest-client/electron-amf-service",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Electron module that parses APIs using AMF parser",
   "main": "index.js",
   "scripts": {
-    "test": "electron-mocha --renderer test/*.test.js",
-    "demo": "electron --inspect=9300 ./demo/main"
+    "test": "electron-mocha --renderer test/*.test.js --timeout 10000",
+    "start": "electron --inspect=9300 ./demo/main"
   },
   "keywords": [
     "drive",
@@ -14,16 +14,19 @@
   ],
   "license": "Apache-2.0",
   "dependencies": {
-    "amf-client-js": "^3.2.1",
-    "fs-extra": "^8.0.1",
+    "amf-client-js": "^3.5.1",
+    "esm": "^3.2.25",
+    "fs-extra": "^8.1.0",
     "tmp": "0.1.0",
-    "unzipper": "^0.9.15"
+    "unzipper": "^0.10.4"
   },
   "devDependencies": {
     "chai": "^4.2.0",
-    "electron": "^5.0.2",
-    "electron-mocha": "^8.0.2",
-    "mocha": "^6.1.4"
+    "electron": "^6.0.10",
+    "electron-mocha": "^8.1.2",
+    "eslint": "^6.4.0",
+    "eslint-config-google": "^0.14.0",
+    "mocha": "^6.2.0"
   },
   "repository": {
     "type": "git",

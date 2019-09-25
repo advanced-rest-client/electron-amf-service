@@ -1,1 +1,2 @@
-module.exports.ElectronAmfService = require('./renderer/electron-amf-service').ElectronAmfService;
+require = require('esm')(module);
+module.exports = require('./main.js');

@@ -1,4 +1,4 @@
-const {app, BrowserWindow} = require('electron');
+const { app, BrowserWindow } = require('electron');
 const path = require('path');
 let mainWindow = null;
 
@@ -10,8 +10,8 @@ function initialize() {
       height: 840,
       title: app.getName(),
       webPreferences: {
-        nodeIntegration: true
-      }
+        nodeIntegration: true,
+      },
     };
 
     mainWindow = new BrowserWindow(windowOptions);

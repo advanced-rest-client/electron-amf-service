@@ -4,7 +4,7 @@ This electron module works in the renderer process and handle web events
 as described in [API data processing events](https://github.com/advanced-rest-client/api-components-api/blob/master/docs/api-processing-events.md)
 of Advanced REST Client documentation.
 
-Allows to safely parse API specification and report back API model.
+Allows to safely parse API specification file(s) and report back generated API model.
 
 The API model is an output of [AMF](https://a.ml) parser and json-ld generator.
 
@@ -16,6 +16,17 @@ Currently it supports the following APIs:
 
 Support for OAS 3.0 in AMF's roadmap.
 
+The parsing process is split into two parts. First is API parsing and the second is API resolving process.
+The second step is to generate a model that works with API Console as it does not work with
+unresolved model.
+
+In Advanced REST Client the API is first parsed and generated unresolved model is stored in
+the data store. This model can be later used to initialize the AMF library. Resolved model changes
+API model and the original information is lost.
+To initialize API Console, ARC then sends the unresolved model back to the parser to
+resolve it. This model is never stored in the data store. It is ponly used to
+initialize API Console.
+
 ## Web based APIs
 
 ### Initialization
@@ -23,20 +34,20 @@ Support for OAS 3.0 in AMF's roadmap.
 In the renderer process.
 
 ```javascript
-const {ElectronAmfService} = require('@advanced-rest-client/electron-amf-service');
+const { ElectronAmfService } = require('@advanced-rest-client/electron-amf-service');
 const service = new ElectronAmfService();
 service.listen();
 ```
 
-This enables event listeners. Call `unlisten()` to remove the listeners.
+This enables event listeners in the renderer process. Call `unlisten()` to remove the listeners.
 
-### process-exchange-asset-data event
+### api-process-link event
 
 Handles event dispatched by [advanced-rest-client/exchange-search-panel](https://github.com/advanced-rest-client/exchange-search-panel).
 It downloads API asset and parses it using AMF service.
 
 After its done it dispatches `api-data-ready` custom event as the panel do not
-handle responses to `process-exchange-asset-data` event.
+handle responses to `api-process-link` event.
 
 **Example**
 
@@ -44,7 +55,7 @@ In the application (renderer process).
 
 ```javascript
 window.addEventListener('api-data-ready', (e) => {
-  console.log(e.detail.api); // outputs AMF model
+  console.log(e.detail.api); // outputs unresolved AMF model
 });
 
 window.addEventListener('process-error', (e) => {
@@ -54,32 +65,53 @@ window.addEventListener('process-error', (e) => {
 });
 ```
 
-### api-process-file event
+### api-process-file and api-resolve-model event
 
-API to be dispatched when the user selects a file to parse.
+Event to be dispatched when the user selects a file to parse.
 The file can be a single File (Blob) or Buffer.
 
-The library supports raw files or compressed zip files.
-
+The library supports API files or compressed zip files.
 
 **Example**
 
 ```javascript
-const e = new CustomEvent('api-process-file', (e) => {
-  bubbles: true,
-  cancelable: true,
-  detail: {
-    // blob is a file or blob object. Any file object that is API file.
-    // It also can be a Buffer
-    file: blob
+async function processApi(file) {
+  const e = new CustomEvent('api-process-file', {
+    bubbles: true,
+    cancelable: true,
+    detail: {
+      // blob is a file or blob object. Any file object that is API file.
+      // It also can be a Buffer
+      file
+    }
+  });
+  document.body.dispatchEvent(e);
+  if (!e.defaultPrevented) {
+    throw new Error('Initialize AMF service first.');
   }
-});
-document.body.dispatchEvent(e);
-if (e.defaultPrevented) {
-  e.detail.result
-  .then((api) => console.log(api)) // Run API console
-  .catch((cause) => console.error(cause));
+  return await e.detail.result;
 }
+
+async function resolveApi(model, type) {
+  const e = new CustomEvent('api-resolve-model', {
+    bubbles: true,
+    cancelable: true,
+    detail: {
+      model,
+      type
+    }
+  });
+  document.body.dispatchEvent(e);
+  if (!e.defaultPrevented) {
+    throw new Error('Initialize AMF service first.');
+  }
+  return await e.detail.result;
+}
+const apiInfo = await processApi(apiFile);
+console.log(apiInfo); // Object{ model: '...', type: Object{ type: '...', contentType: '...' } }
+const resolvedModel = await resolveApi(apiInfo.model, apiInfo.type);
+const model = JSON.parse(resolvedModel);
+apiConsole.amf = model;
 ```
 
 ### api-select-entrypoint event

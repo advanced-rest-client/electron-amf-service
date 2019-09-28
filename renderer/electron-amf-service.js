@@ -1,4 +1,7 @@
 import { AmfService } from '../lib/amf-service';
+import { fork } from 'child_process';
+import path from 'path';
+import crypto from 'crypto';
 /**
  * A class to be used in the renderer process to download and extract RAML
  * data from Exchange asset.
@@ -10,6 +13,7 @@ export class ElectronAmfService {
   constructor() {
     this._assetHandler = this._assetHandler.bind(this);
     this._fileHandler = this._fileHandler.bind(this);
+    this._resolveHandler = this._resolveHandler.bind(this);
   }
   /**
    * Sets `loading` flag.
@@ -55,8 +59,9 @@ export class ElectronAmfService {
    * Observes for ARC's DOM events
    */
   listen() {
-    window.addEventListener('process-exchange-asset-data', this._assetHandler);
+    window.addEventListener('api-process-link', this._assetHandler);
     window.addEventListener('api-process-file', this._fileHandler);
+    window.addEventListener('api-resolve-model', this._resolveHandler);
   }
   /**
    * Removes observers for ARC's DOM events
@@ -64,9 +69,9 @@ export class ElectronAmfService {
    * @return {Promise}
    */
   unlisten() {
-    window.removeEventListener('process-exchange-asset-data',
-        this._assetHandler);
+    window.removeEventListener('api-process-link', this._assetHandler);
     window.removeEventListener('api-process-file', this._fileHandler);
+    window.removeEventListener('api-resolve-model', this._resolveHandler);
     return this.cleanup();
   }
   /**
@@ -80,8 +85,12 @@ export class ElectronAmfService {
     }
   }
   /**
-   * Handler for the `process-exchange-asset-data` custom event from Exchange
-   * asset search panel.
+   * Handler for the `api-process-link`. The event contains `url` of the asset
+   * to download and additional, helper properties:
+   * - mainFile {String} - API main file. If not set the program will
+   * try to discover main API file.
+   * - md5 {String} - File hash with md5. If not set the checksum is not tested.
+   * - packaging {String} Compression format. Default to zip.
    *
    * @param {CustomEvent} e
    */
@@ -90,24 +99,8 @@ export class ElectronAmfService {
       return;
     }
     e.preventDefault();
-    const asset = e.detail;
-    let file = asset.files.find((i) => i.classifier === 'fat-raml');
-    if (!file) {
-      file = asset.files.find((i) => i.classifier === 'raml');
-    }
-    if (!file || !file.externalLink) {
-      this.notifyError('RAML data not found in the asset.');
-      return;
-    }
-    try {
-      const model = await this.processApiLink(file.externalLink);
-      setTimeout(() => {
-        this.notifyApi(model);
-      });
-      return model;
-    } catch (cause) {
-      this.notifyError(cause.message);
-    }
+    const { url, mainFile, md5, packaging } = e.detail;
+    e.detail.result = this.processApiLink(url, mainFile, md5, packaging);
   }
   /**
    * Handles `api-process-file` custom event.
@@ -127,14 +120,54 @@ export class ElectronAmfService {
     e.detail.result = this.processApiFile(e.detail.file);
   }
   /**
+   * Handler for the `api-resolve-model` event.
+   * Resolves unresolved model using the "editing" pipeline of AMF.
+   * @param {CustomEvent} e
+   */
+  _resolveHandler(e) {
+    if (e.defaultPrevented) {
+      return;
+    }
+    e.preventDefault();
+    const { model, type } = e.detail;
+    if (!model) {
+      e.detail.result = Promise.reject(
+          new Error('The "model" property is not set.'));
+      return;
+    }
+    if (typeof model !== 'string') {
+      e.detail.result = Promise.reject(
+          new Error('The "model" property is not a string.'));
+      return;
+    }
+    if (!type) {
+      e.detail.result = Promise.reject(
+          new Error('The API "type" property is not set.'));
+      return;
+    }
+    e.detail.result = this.resolveAPiConsole(model, type);
+  }
+  /**
    * It downloads the file and processes it as a zipped API project.
    * @param {String} url API remote location.
-   * @return {Promise<Object>} Promise resolved to the AMF json-ld model.
+   * @param {?String} mainFile API main file. If not set the program will try to
+   * find the best match.
+   * @param {?String} md5 When set it will test data integrity with the hash
+   * @param {?String} packaging Default to `zip`.
+   * @return {Promise<String>} Promise resolved to the AMF json-ld model.
    */
-  async processApiLink(url) {
+  async processApiLink(url, mainFile, md5, packaging) {
     this.loading = true;
+    const bufferOpts = {};
+    if (packaging && packaging === 'zip') {
+      bufferOpts.zip = true;
+    }
+    if (mainFile) {
+      bufferOpts.mainFile = mainFile;
+    }
     try {
       const buffer = await this.downloadRamlData(url);
+      this._checkIntegrity(buffer, md5);
       const result = await this.processBuffer(buffer);
       this.loading = false;
       return result;
@@ -176,10 +209,10 @@ export class ElectronAmfService {
     if (!this.loading) {
       this.loading = true;
     }
-    if (this._bufferIsZip(buffer)) {
-      if (!opts) {
-        opts = {};
-      }
+    if (!opts) {
+      opts = {};
+    }
+    if (!opts.zip && this._bufferIsZip(buffer)) {
       opts.zip = true;
     }
     const service = this.service;
@@ -189,7 +222,7 @@ export class ElectronAmfService {
     let exception;
     try {
       await service.prepare();
-      const candidates = await service.resolve();
+      const candidates = await service.resolve(opts.mainFile);
       if (candidates) {
         result = await this._processCandidates(service, candidates);
       } else {
@@ -217,9 +250,9 @@ export class ElectronAmfService {
         await service.cancel();
       } else {
         const model = await service.parse(file);
-        setTimeout(() => {
-          this.notifyApi(model);
-        });
+        // setTimeout(() => {
+        //   this.notifyApi(model);
+        // });
         return model;
       }
     } catch (e) {
@@ -273,6 +306,77 @@ export class ElectronAmfService {
     }
     const buff = await response.arrayBuffer();
     return Buffer.from(buff);
+  }
+  /**
+   * Checks for Exchange file integrity, using passed md5 hash.
+   * @param {Buffer} buffer File's buffer
+   * @param {String} md5 File's hash
+   * @return {Buffer}
+   * @throws {Error} When computed md5 sum is not valid.
+   */
+  _checkIntegrity(buffer, md5) {
+    if (!md5) {
+      return buffer;
+    }
+    const hash = crypto.createHash('md5').update(buffer, 'utf8').digest('hex');
+    if (hash === md5) {
+      return buffer;
+    }
+    throw new Error('API file integrity test failed. Checksum missmatch.');
+  }
+  /**
+   * Resolves AMD model using AMF's resolved pipeline. This model can be used
+   * in API Console.
+   * @param {Object} model AMF's unresolved model
+   * @param {String} type API type
+   * @return {Promise}
+   */
+  async resolveAPiConsole(model, type) {
+    return new Promise((resolve, reject) => {
+      const proc = this._createResolverProcess();
+      const callbacks = {
+        onmessage: (result) => {
+          this._killResolver(proc);
+          if (result.error) {
+            reject(new Error(result.error));
+          } else {
+            resolve(result.api);
+          }
+        },
+        onerror: (err) => {
+          this._killResolver(proc);
+          reject(new Error(err.message || 'Unknown error'));
+        },
+      };
+      proc.on('message', callbacks.onmessage);
+      proc.on('error', callbacks.onerror);
+      proc.send({
+        model,
+        type,
+      });
+    });
+  }
+  /**
+   * Creates new child process for the AMF resolver.
+   * @return {Object} Child process reference.
+   */
+  _createResolverProcess() {
+    const options = {
+      execArgv: [],
+    };
+    return fork(path.join(__dirname, '..', 'lib', 'amf-resolver.js'), options);
+  }
+  /**
+   * Kills resolver child process.
+   * @param {Object} proc A reference to the child rpocess.
+   */
+  _killResolver(proc) {
+    if (proc.connected) {
+      proc.disconnect();
+    }
+    proc.removeAllListeners('message');
+    proc.removeAllListeners('error');
+    proc.kill();
   }
   /**
    * Dispatches a custom event

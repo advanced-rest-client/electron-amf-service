@@ -1,6 +1,6 @@
 {
   "name": "@advanced-rest-client/electron-amf-service",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "Electron module that parses APIs using AMF parser",
   "main": "index.js",
   "scripts": {
@@ -14,7 +14,7 @@
   ],
   "license": "Apache-2.0",
   "dependencies": {
-    "amf-client-js": "^3.5.1",
+    "amf-client-js": "^3.5.3",
     "esm": "^3.2.25",
     "fs-extra": "^8.1.0",
     "tmp": "0.1.0",

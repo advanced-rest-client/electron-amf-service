@@ -6,6 +6,9 @@ service.listen();
  */
 function reportMessage(message) {
   const node = document.getElementById('out');
+  if (message && typeof message !== 'string') {
+    message = JSON.stringify(message, null, 2);
+  }
   node.innerText = message;
 }
 /**

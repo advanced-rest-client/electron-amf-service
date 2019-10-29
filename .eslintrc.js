@@ -1,7 +1,11 @@
 module.exports = {
   "extends": "google",
   "env": {
-    "browser": true,
+    "browser": false,
     "node": true
-  }
+  },
+  parserOptions: {
+    sourceType: 'module',
+    ecmaVersion: 8
+  },
 };

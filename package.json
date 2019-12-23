@@ -1,6 +1,6 @@
 {
   "name": "@advanced-rest-client/electron-amf-service",
-  "version": "3.0.0-preview.1",
+  "version": "3.0.0",
   "description": "Electron module that parses APIs using AMF parser",
   "main": "index.js",
   "scripts": {

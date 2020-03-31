@@ -301,7 +301,7 @@ export class ElectronAmfService {
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(
-          `Unable to download the asset. Status: ${response.status}`
+          `Unable to download the asset. Status: ${response.status}`,
       );
     }
     const buff = await response.arrayBuffer();

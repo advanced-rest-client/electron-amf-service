@@ -3,9 +3,5 @@ test/
 demo/
 CONTRIBUTING.md
 .travis.yml
-karma.*
-husky.*
-commitlint.*
 .*
-*.config.*
-prettier.config.js
+tsconfig.json

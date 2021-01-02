@@ -1,8 +1,9 @@
 {
   "name": "@advanced-rest-client/electron-amf-service",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "description": "Electron module that parses APIs using AMF parser",
   "main": "index.js",
+  "module": "main.js",
   "scripts": {
     "test": "electron-mocha --renderer test/*.test.js --timeout 10000",
     "start": "electron --inspect=9300 ./demo/main"
@@ -13,24 +14,6 @@
     "ARC"
   ],
   "license": "Apache-2.0",
-  "dependencies": {
-    "amf-client-js": "^4.0.6",
-    "esm": "^3.2.25",
-    "fs-extra": "^9.0.0",
-    "tmp": "0.1.0",
-    "unzipper": "^0.10.10"
-  },
-  "devDependencies": {
-    "chai": "^4.2.0",
-    "electron": "^8.2.0",
-    "electron-mocha": "^8.2.1",
-    "eslint": "^6.8.0",
-    "eslint-config-google": "^0.14.0",
-    "mocha": "^7.1.1"
-  },
-  "peerDependencies": {
-    "electron": "^8.2.0"
-  },
   "repository": {
     "type": "git",
     "url": "https://github.com/advanced-rest-client/electron-amf-service"
@@ -43,7 +26,50 @@
     "Pawel Psztyc",
     "The Advanced REST client authors <arc@mulesoft.com>"
   ],
+  "dependencies": {
+    "@advanced-rest-client/arc-events": "^0.2.13",
+    "amf-client-js": "^4.5.1",
+    "esm": "^3.2.25",
+    "fs-extra": "^9.0.1",
+    "tmp-promise": "^3.0.2",
+    "unzipper": "^0.10.11"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.2.14",
+    "@types/fs-extra": "^9.0.6",
+    "@types/mocha": "^8.2.0",
+    "@types/node": "^14.14.16",
+    "@types/unzipper": "^0.10.3",
+    "chai": "^4.2.0",
+    "electron": "^11.1.1",
+    "electron-mocha": "^10.0.0",
+    "eslint": "^7.16.0",
+    "eslint-config-esnext": "^4.1.0",
+    "eslint-config-google": "^0.14.0",
+    "eslint-config-node": "^4.1.0",
+    "eslint-config-prettier": "^7.1.0",
+    "eslint-plugin-babel": "^5.3.1",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-no-only-tests": "^2.4.0",
+    "husky": "^4.3.6",
+    "lint-staged": "^10.5.3",
+    "mocha": "^8.2.1",
+    "typescript": "^4.1.3"
+  },
+  "peerDependencies": {
+    "electron": "^11.1.1"
+  },
   "ignore": [
     "demo"
-  ]
+  ],
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.js": [
+      "eslint --fix"
+    ]
+  }
 }

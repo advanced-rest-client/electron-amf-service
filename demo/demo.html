@@ -54,6 +54,20 @@
     white-space: pre-wrap;
     display: block;
   }
+
+  .dialog-title {
+    display: block;
+    font-weight: 300;
+    font-size: 1.2rem;
+  }
+
+  .api-entry-point-selector {
+    margin: 12px 0;
+  }
+
+  .dialog-actions {
+    margin-top: 12px;
+  }
   </style>
 </head>
 
@@ -66,20 +80,6 @@
     <h2>Result</h2>
     <output id="out">Not ready</output>
   </section>
-
-  <dialog id="filesDialog">
-    <form method="dialog">
-      <p>
-        <label>Select API file:
-          <select name="files"></select>
-        </label>
-      </p>
-      <menu>
-        <button value="cancel">Cancel</button>
-        <button id="confirmBtn" value="default">Confirm</button>
-      </menu>
-    </form>
-  </dialog>
   <script src="demo.js"></script>
 </body>
 

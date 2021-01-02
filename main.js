@@ -1,1 +1,1 @@
-export { ElectronAmfService } from './renderer/electron-amf-service.js';
+export { ElectronAmfService } from './renderer/ElectronAmfService.js';
